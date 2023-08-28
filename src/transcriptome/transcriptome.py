@@ -9,7 +9,6 @@ EXON = 'exon'
 CDS = 'CDS'
 FIVE_PRIME_UTR = 'five_prime_UTR'
 THREE_PRIME_UTR = 'three_prime_UTR'
-OTHER_ELEMENT_TYPE = 'other'
 
 
 class FunctionalGenomicRegion:

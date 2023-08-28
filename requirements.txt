@@ -1,0 +1,3 @@
+#### Requirements ####
+pysam>=0.11.2.2
+variant-extractor

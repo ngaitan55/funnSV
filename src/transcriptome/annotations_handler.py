@@ -2,7 +2,7 @@ from __future__ import annotations
 import sys
 from typing import Dict, Union, Optional
 from transcriptome import FunctionalGenomicRegion, Gene, Transcript, TranscriptElement, GENE, TRANSCRIPT, EXON, \
-    THREE_PRIME_UTR, FIVE_PRIME_UTR, OTHER_ELEMENT_TYPE
+    THREE_PRIME_UTR, FIVE_PRIME_UTR, CDS
 
 # Static values
 GFF_FIELD_SEPARATOR: str = '\t'
@@ -13,6 +13,7 @@ ATTRIBUTE_KEY_VALUE: str = '='
 
 
 class GFF3FileReader:
+    """File Reader class for standard GFF3 files, requires a file path string to initialize"""
     # Static value to check GFF format line
     _format_line_id = '#'
     # Attributes
@@ -40,6 +41,7 @@ class GFF3FileReader:
         return self
 
     def __next__(self) -> Optional[GFF3Record]:
+        """ Returns GFF3Record if the line is formatted correctly or None if it is a header line"""
         gff_file_line: str = self.__file_object.readline()
         if self.__file_object is None or gff_file_line == '':
             raise StopIteration
@@ -64,8 +66,9 @@ class GFF3FileReader:
             return GFF3Record(seqid, source, genomic_region_type, start, end, score, strand, phase, info_string)
 
 
-# Informal Interface for record classes from different sources
 class AnnotationRecord:
+    """Informal Interface for record classes from different sources"""
+
     def make_functional_annotation(self, *args) -> FunctionalGenomicRegion:
         pass
 
@@ -82,7 +85,8 @@ def _compute_attributes_from_gff_info_field(attributes_str: str) -> Dict[str, st
 
 
 class GFF3Record(AnnotationRecord):
-    # Class that represents a typical GFF3 record based on the format specification by Lincoln Stein at https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md
+    """Class that represents a typical GFF3 record based on the format specification by Lincoln Stein at https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md"""
+    # Static attributes
     ATTRIBUTE_ID = 'ID'
     ATTRIBUTE_NAME = 'Name'
     ATTRIBUTE_ALIAS = 'Alias'
@@ -116,7 +120,7 @@ class GFF3Record(AnnotationRecord):
         first = self.start
         last = self.end
         length = last - first + 1
-        info = self.attributes
+        info: Dict[str, str] = self.attributes
         if GENE == self.type:
             if ID is None:
                 raise ValueError('gff3 Gene record is malformed, it does not contain an ID')
@@ -127,16 +131,21 @@ class GFF3Record(AnnotationRecord):
             if parent is None:
                 raise ValueError('Transcript has no parent Gene, it cannot be instantiated')
             return Transcript(parent, ID, first, last, length, info)
-        else:
+        elif self.type in (EXON, FIVE_PRIME_UTR, THREE_PRIME_UTR, CDS):
             if parent is None:
                 raise ValueError('Transcript element has no parent Transcript, it cannot be instantiated')
             return TranscriptElement(parent, ID, first, last, length, self.type, info)
+        else:
+            if ID is None:
+                ID = 'Unknown_ID'
+            return FunctionalGenomicRegion(ID, sequence_name, first, last, length, self.type, info)
 
     def __str__(self):
         return f"{self.seqid}{GFF_FIELD_SEPARATOR}{self.source}{GFF_FIELD_SEPARATOR}{self.type}{GFF_FIELD_SEPARATOR}{self.start}{GFF_FIELD_SEPARATOR}" \
                f"{self.end}{GFF_FIELD_SEPARATOR}{self.score}{GFF_FIELD_SEPARATOR}{self.strand}{GFF_FIELD_SEPARATOR}{self.phase}{GFF_FIELD_SEPARATOR}{self.attributes}"
 
 
+# Only for testing purposes
 if __name__ == "__main__":
     test_file = sys.argv[1]
     with GFF3FileReader(test_file) as gff_reader:
