@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 # Static values
 # Functional common region types
@@ -19,6 +19,7 @@ class FunctionalGenomicRegion:
     length: int
     region_type: str
     info: Optional[Dict[str, str]]
+    child_elements: List[Union[FunctionalGenomicRegion, Transcript, TranscriptElement]]
 
     def __init__(self, region_id: str, sequence_name: str, first: int, last: int, length: int, region_type: str,
                  info: Optional[Dict[str, str]]):
@@ -26,44 +27,38 @@ class FunctionalGenomicRegion:
         self.sequence_name = sequence_name
         self.first = first
         self.last = last
-        self.last = length
+        self.length = length
         self.region_type = region_type
         self.info = info
+        self.child_elements = []
+
+    def add_element(self, new_element: Union[FunctionalGenomicRegion, Transcript, TranscriptElement]):
+        self.child_elements.append(new_element)
+
+    def __str__(self):
+        return f"{self.ID}'\t'{self.sequence_name}'\t'{self.region_type}'\t'{self.first}'\t'" \
+               f"{self.last}'\t'{self.length}'\t'{self.info}"
 
 
 class TranscriptElement(FunctionalGenomicRegion):
-    transcript: Transcript
 
-    def __init__(self, transcript: Transcript, element_id: Optional[str], first: int, last: int, length: int,
+    def __init__(self, element_id: Optional[str], sequence_name: str, first: int, last: int, length: int,
                  region_type: str, info: Optional[Dict[str, str]] = None):
-        self.transcript = transcript
         if region_type in (GENE, TRANSCRIPT):
             raise TypeError('Transcript element must be a different type from Gene or Transcript')
-        super(TranscriptElement, self).__init__(element_id, transcript.sequence_name, first, last, length, region_type,
+        super(TranscriptElement, self).__init__(element_id, sequence_name, first, last, length, region_type,
                                                 info)
 
 
 class Transcript(FunctionalGenomicRegion):
-    gene: Gene
-    elements: List[FunctionalGenomicRegion]
 
-    def __init__(self, gene: Gene, transcript_id: str, first: int, last: int, length: int,
+    def __init__(self, transcript_id: str, sequence_name: str, first: int, last: int, length: int,
                  info: Optional[Dict[str, str]] = None):
-        self.gene = gene
-        self.elements = []
-        super(Transcript, self).__init__(transcript_id, gene.sequence_name, first, last, length, TRANSCRIPT, info)
-
-    def add_element(self, new_element: TranscriptElement):
-        self.elements.append(new_element)
+        super(Transcript, self).__init__(transcript_id, sequence_name, first, last, length, TRANSCRIPT, info)
 
 
 class Gene(FunctionalGenomicRegion):
-    transcripts: List[Transcript]
 
     def __init__(self, gene_id: str, sequence_name: str, first: int, last: int, length: int,
                  info: Optional[Dict[str, str]] = None):
-        self.transcripts = []
         super(Gene, self).__init__(gene_id, sequence_name, first, last, length, GENE, info)
-
-    def add_transcript(self, new_transcript: Transcript):
-        self.transcripts.append(new_transcript)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import sys
-from typing import Dict, Union, Optional
+from typing import Dict, Union, Optional, List, Sequence
 from transcriptome import FunctionalGenomicRegion, Gene, Transcript, TranscriptElement, GENE, TRANSCRIPT, EXON, \
     THREE_PRIME_UTR, FIVE_PRIME_UTR, CDS
 
@@ -11,13 +11,74 @@ GFF_COLUMN_NUMBER: int = 9
 ATTRIBUTE_SEPARATOR: str = ';'
 ATTRIBUTE_KEY_VALUE: str = '='
 
+LOAD_MODE_MINIMAL = 'minimal'
+LOAD_MODE_BALANCED = 'balanced'
+LOAD_MODE_COMPLETE = 'complete'
+
+
+def load_transcriptome_from_gff3(gff3_path: str, ref_sequences: Sequence[str], mode: str) -> (List[Union[Gene, FunctionalGenomicRegion]], List[str]):
+    """Load transcriptome from a gff3 file into a List of Gene objects, depending on the mode, different features will be included, as:
+    @:param
+        gff3_path:str - the string path for the gff3 file
+        ref_sequences: Sequence[str] - Contains valid sequences for this transcriptome from the reference genome
+        mode: str - loading mode, as follows:
+            LOAD_MODE_MINIMAL: Only gene records will be loaded
+            LOAD_MODE_BALANCED: Genes, mRNA and 5UTR, 3UTR, CDS, Exons will be loaded
+            LOAD_MODE_COMPLETE: Elements other than balanced mode objects will be loaded as FunctionalGenomicRegion generic instances
+    @:returns List of Gene and FunctionalGenomicRegions representing the transcriptome and a List with the header lines"""
+    transcriptome: List[Union[Gene, FunctionalGenomicRegion]] = []
+    agenda: Dict[str, Union[Gene, Transcript, FunctionalGenomicRegion]] = {}
+    with GFF3FileReader(gff3_path) as gff_records_iterator:
+        for gff_rec in gff_records_iterator:
+            if gff_rec is None:
+                continue
+            if gff_rec.seqid not in ref_sequences:
+                raise ValueError(
+                    f'gff record is annotated on invalid sequence: {gff_rec.seqid}, check gff file and reference genome')
+            if gff_rec.type == GENE:
+                current_gene: Gene = gff_rec.make_functional_annotation()
+                agenda[current_gene.ID] = current_gene
+                transcriptome.append(current_gene)
+            elif gff_rec.type == TRANSCRIPT:
+                if LOAD_MODE_MINIMAL == mode:
+                    continue
+                current_transcript: Transcript = gff_rec.make_functional_annotation()
+                agenda[current_transcript.ID] = current_transcript
+                parent_id = current_transcript.info.get(gff_rec.ATTRIBUTE_PARENT)
+                parent_gene = agenda.get(parent_id)
+                if parent_gene is None:
+                    continue
+                parent_gene.add_element(current_transcript)
+            elif gff_rec.type in (EXON, CDS, FIVE_PRIME_UTR, THREE_PRIME_UTR):
+                if LOAD_MODE_MINIMAL == mode:
+                    continue
+                current_transcript_element: TranscriptElement = gff_rec.make_functional_annotation()
+                parent_id = current_transcript_element.info.get(gff_rec.ATTRIBUTE_PARENT)
+                parent_transcript = agenda.get(parent_id, None)
+                if parent_transcript is None:
+                    continue
+                parent_transcript.add_element(current_transcript_element)
+            else:
+                if mode != LOAD_MODE_COMPLETE:
+                    continue
+                current_other_annotation: FunctionalGenomicRegion = gff_rec.make_functional_annotation()
+                parent_id = current_other_annotation.info.get(gff_rec.ATTRIBUTE_PARENT, None)
+                if current_other_annotation.ID != gff_rec.GENERIC_ID:
+                    if parent_id is None:
+                        transcriptome.append(current_other_annotation)
+                    agenda[current_other_annotation.ID] = current_other_annotation
+                parent = agenda.get(parent_id)
+                parent.add_element(current_other_annotation)
+        format_lines: List[str] = gff_records_iterator.format_lines
+    return transcriptome, format_lines
+
 
 class GFF3FileReader:
     """File Reader class for standard GFF3 files, requires a file path string to initialize"""
     # Static value to check GFF format line
     _format_line_id = '#'
     # Attributes
-    format_lines = []
+    format_lines: List[str] = []
 
     def __init__(self, file_path: str):
         if not file_path.endswith(('.gff', '.gff3', '.gtf')):
@@ -90,7 +151,9 @@ class GFF3Record(AnnotationRecord):
     ATTRIBUTE_ID = 'ID'
     ATTRIBUTE_NAME = 'Name'
     ATTRIBUTE_ALIAS = 'Alias'
+    ATTRIBUTE_PARENT = 'Parent'
 
+    GENERIC_ID = 'generic_id'
     # Fields
     seqid: str
     source: str
@@ -114,8 +177,9 @@ class GFF3Record(AnnotationRecord):
         self.phase = phase
         self.attributes = _compute_attributes_from_gff_info_field(attributes_str)
 
-    def make_functional_annotation(self, parent: Optional[Gene, Transcript] = None) -> FunctionalGenomicRegion:
+    def make_functional_annotation(self) -> Union[Gene, Transcript, TranscriptElement, FunctionalGenomicRegion]:
         ID = self.attributes.get(self.ATTRIBUTE_ID, None)
+        parent = self.attributes.get(self.ATTRIBUTE_PARENT, None)
         sequence_name = self.seqid
         first = self.start
         last = self.end
@@ -123,21 +187,21 @@ class GFF3Record(AnnotationRecord):
         info: Dict[str, str] = self.attributes
         if GENE == self.type:
             if ID is None:
-                raise ValueError('gff3 Gene record is malformed, it does not contain an ID')
+                raise ValueError(f'gff3 Gene record {str(self)} is malformed, it does not contain an ID')
             return Gene(ID, sequence_name, first, last, length, info)
         elif TRANSCRIPT == self.type:
             if ID is None:
-                raise ValueError('gff3 Transcript mRNA record is malformed, it does not contain an ID')
+                raise ValueError(f'gff3 Transcript mRNA record {str(self)} is malformed, it does not contain an ID')
             if parent is None:
-                raise ValueError('Transcript has no parent Gene, it cannot be instantiated')
-            return Transcript(parent, ID, first, last, length, info)
+                raise ValueError(f'Transcript from {str(self)} has no parent Gene, it cannot be instantiated')
+            return Transcript(ID, sequence_name, first, last, length, info)
         elif self.type in (EXON, FIVE_PRIME_UTR, THREE_PRIME_UTR, CDS):
             if parent is None:
-                raise ValueError('Transcript element has no parent Transcript, it cannot be instantiated')
-            return TranscriptElement(parent, ID, first, last, length, self.type, info)
+                raise ValueError(f'Transcript element from {str(self)} has no parent Transcript, it cannot be instantiated')
+            return TranscriptElement(ID, sequence_name, first, last, length, self.type, info)
         else:
             if ID is None:
-                ID = 'Unknown_ID'
+                ID = self.GENERIC_ID
             return FunctionalGenomicRegion(ID, sequence_name, first, last, length, self.type, info)
 
     def __str__(self):
@@ -147,7 +211,19 @@ class GFF3Record(AnnotationRecord):
 
 # Only for testing purposes
 if __name__ == "__main__":
+    from pysam import FastaFile
     test_file = sys.argv[1]
-    with GFF3FileReader(test_file) as gff_reader:
-        for gff_record in gff_reader:
-            print(str(gff_record))
+    ref_genome_path = sys.argv[2]
+    mode = sys.argv[3]
+    try:
+        ref_genome: FastaFile = FastaFile(ref_genome_path)
+        ref_seqs: Sequence[str] = ref_genome.references
+        test_transcriptome, _ = load_transcriptome_from_gff3(test_file, ref_seqs, mode)
+        for gene in test_transcriptome:
+            print(str(gene))
+            for transcript in gene.child_elements:
+                print(str(transcript))
+                for tr_element in transcript.child_elements:
+                    print(str(tr_element))
+    except Exception as error:
+        print(error)
