@@ -8,7 +8,9 @@
 # Contact: nicolas.gaitan@bsc.es
 # MIT License
 import sys
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
+import logging
+from structural_variants_functional_annotator import run_sv_annotation
 
 if not sys.version_info >= (3, 7):
     raise SystemError(
@@ -27,20 +29,23 @@ def exec_parser():
                         help='input fasta reference genome, must be indexed (.fa, .fasta, .fna)', required=True)
     parser.add_argument('-m', '--mode', type=str, default='balanced', choices=['minimal', 'balanced', 'complete'], help='mode of annotations, between {minimal:\
             annotate only genes | balanced: annotate genes and their transcripts with specific elements | complete: annotate every element in the gff}')
-    parser.add_argument('-o', '--output_vcf', type=str, help='output file path for annotated vcf file', required=True)
+    parser.add_argument('-o', '--output_vcf_prefix', type=str, help='output file path prefix for annotated vcf file', required=True)
     config = parser.parse_args()
     return config
 
 
 def funnSV_main():
+    logging.info('Beginning execution')
     config = exec_parser()
     vcf_path = config.input
     gff_path = config.gff_file
     ref_genome_path = config.ref_genome
     mode = config.mode
-    vcf_output = config.output_vcf
-    # annotated_variants = annotate_structural_variants(vcf_path, gff_path, ref_genome_path, mode)
+    vcf_output = config.output_vcf_prefix
+    logging.info('Producing annotation of vcf structural variants')
+    run_sv_annotation(vcf_path, gff_path, ref_genome_path, mode, vcf_output)
+    logging.info('Finished execution of funnSV successfully')
 
 
 if __name__ == "__main__":
-    pass
+    funnSV_main()

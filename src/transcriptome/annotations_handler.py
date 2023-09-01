@@ -1,7 +1,7 @@
 from __future__ import annotations
 import sys
 from typing import Dict, Union, Optional, List, Sequence
-from transcriptome import FunctionalGenomicRegion, Gene, Transcript, TranscriptElement, GENE, TRANSCRIPT, EXON, \
+from .transcriptome import FunctionalGenomicRegion, Gene, Transcript, TranscriptElement, GENE, TRANSCRIPT, EXON, \
     THREE_PRIME_UTR, FIVE_PRIME_UTR, CDS
 
 # Static values
