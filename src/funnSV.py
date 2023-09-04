@@ -27,9 +27,12 @@ def exec_parser():
                         required=True)
     parser.add_argument('-r', '--ref_genome', type=str,
                         help='input fasta reference genome, must be indexed (.fa, .fasta, .fna)', required=True)
-    parser.add_argument('-m', '--mode', type=str, default='balanced', choices=['minimal', 'balanced', 'complete'], help='mode of annotations, between {minimal:\
-            annotate only genes | balanced: annotate genes and their transcripts with specific elements | complete: annotate every element in the gff}')
-    parser.add_argument('-o', '--output_vcf_prefix', type=str, help='output file path prefix for annotated vcf file', required=True)
+    parser.add_argument('-m', '--mode', type=str, default='balanced',
+                        choices=['minimal', 'balanced', 'complete', 'minimal_pc'], help='mode of annotations, between {minimal:\
+            annotate only genes | balanced: annotate genes and their transcripts with specific elements | complete: annotate every element in the gff | \
+            minimal_pc: Only genes with the biotype=protein_coding, to be used for very specific use cases}')
+    parser.add_argument('-o', '--output_vcf_prefix', type=str, help='output file path prefix for annotated vcf file',
+                        required=True)
     config = parser.parse_args()
     return config
 

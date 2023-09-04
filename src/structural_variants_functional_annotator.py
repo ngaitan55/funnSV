@@ -6,22 +6,20 @@ import pysam
 from pysam import FastaFile
 from variant_extractor import VariantExtractor
 from variant_extractor.variants import VariantRecord
-from transcriptome.transcriptome import Gene, Transcript, TranscriptElement, FunctionalGenomicRegion, GENE, TRANSCRIPT, \
-    EXON, CDS, THREE_PRIME_UTR, FIVE_PRIME_UTR
-from transcriptome.annotations_handler import load_transcriptome_from_gff3, LOAD_MODE_MINIMAL, LOAD_MODE_BALANCED, \
-    LOAD_MODE_COMPLETE
+from annotations.transcriptome import Gene, Transcript, TranscriptElement, FunctionalGenomicRegion
+from annotations.annotations_handler import load_transcriptome_from_gff3
 
 OUTPUT_FILE_EXTENSION = 'vcf'
 
 
 def _load_structural_variants(vcf_path: str, ref_sequences: Sequence[str]) -> List[VariantRecord]:
     variants: List[VariantRecord] = []
-    with VariantExtractor(vcf_path) as variants_iterator:
-        for variant_record in variants_iterator:
-            if variant_record.contig not in ref_sequences:
-                raise ValueError(
-                    f'variant record located in invalid sequence: {variant_record.contig}, check vcf and reference genome')
-            variants.append(variant_record)
+    variants_extractor = VariantExtractor(vcf_path)
+    for variant_record in variants_extractor:
+        if variant_record.contig not in ref_sequences:
+            raise ValueError(
+                f'variant record located in invalid sequence: {variant_record.contig}, check vcf and reference genome')
+        variants.append(variant_record)
     return variants
 
 
@@ -77,12 +75,14 @@ def _compare_by_coordinates(variant: VariantRecord,
 
 
 def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: List[Gene, FunctionalGenomicRegion],
+                                  ranked_sequences: Dict[str, int],
                                   compare: Callable[[VariantRecord, Union[
-                                      Gene, Transcript, TranscriptElement, FunctionalGenomicRegion]], int]):
+                                      Gene, Transcript, TranscriptElement, FunctionalGenomicRegion],
+                                                     Dict[str, int]], int]):
     """
-    Annotates a structural variant list with a transcriptome coming from the transcriptome module
+    Annotates a structural variant list with a annotations coming from the annotations module
     :param variants: List with structural variants to annotate - <pre> Must be ordered by reference sequence and coordinates </pre>
-    :param transcriptome: List with a transcriptome represented by genes - <pre> Must be ordered by reference sequence and coordinates </pre>
+    :param transcriptome: List with a annotations represented by genes - <pre> Must be ordered by reference sequence and coordinates </pre>
     :param compare: Function that compares a variant with a functional genomic region allowing the
         definition of the comparison to be flexible and dependent on the implementation of the parameter function
         must return an integer type
@@ -91,47 +91,56 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
     transcript_annotation_key_prefix = 'TRANSCRIPT_ANNOTATION'
     element_annotation_key_prefix = 'ELEMENT_ANNOTATION'
 
-    def single_annotation(dict_x: Dict[str, str]) -> str:
+    def make_single_annotation(dict_x: Dict[str, str]) -> str:
         return ';'.join([f'{key}={value}' for key, value in dict_x.items()])
 
-    variants_it = iter(variants)
-    transcriptome_it = iter(transcriptome)
-    left_over_genes: List[Gene] = []
-    current_variant: VariantRecord = next(variants_it, None)
-    current_gene: Gene = next(transcriptome_it, None)
-    while current_variant is not None and current_gene is not None:
-        cmp: int = compare(current_variant, current_gene)
+    i = 0
+    j = 0
+    j_lower_bound = 0
+    variant_interacted = False
+    while i < len(variants) and j < len(transcriptome):
+        current_variant = variants[i]
+        current_gene = transcriptome[j]
+        cmp: int = compare(current_variant, current_gene, ranked_sequences)
+        print(
+            f'VARIANT: seq={current_variant.contig} type={current_variant.variant_type} first={current_variant.pos} last={current_variant.end} - GFFRecord: seq={current_gene.sequence_name}'
+            f' first={current_gene.first} last={current_gene.last} - COMPARE={cmp}')
         if cmp < -1:
-            current_variant = next(variants_it)
-        if cmp > 1:
-            current_gene = next(transcriptome_it, None)
+            i = i + 1
+            j = j_lower_bound
+            variant_interacted = False
+        elif cmp > 1:
+            j_lower_bound = j_lower_bound + 1
+            j = j_lower_bound
         else:
+            if not variant_interacted:
+                variant_interacted = True
+                j_lower_bound = j
             gene_annotation_key = f'{gene_annotation_key_prefix}_{current_gene.ID}'
-            gene_annotation_value = f'[{single_annotation(current_gene.info)}]'
+            gene_annotation_value = f'[{make_single_annotation(current_gene.info)}]'
             current_variant.info[gene_annotation_key] = gene_annotation_value
             transcripts = current_gene.child_elements
             if transcripts:
                 for transcript in transcripts:
-                    cmp_tr = compare(current_variant, transcript)
+                    cmp_tr = compare(current_variant, transcript, ranked_sequences)
                     if -1 <= cmp_tr <= 1:
                         transcript_annotation_key = f'{transcript_annotation_key_prefix}_{transcript.ID}'
-                        transcript_annotation_value = f'[{single_annotation(transcript.info)}]'
+                        transcript_annotation_value = f'[{make_single_annotation(transcript.info)}]'
                         current_variant.info[transcript_annotation_key] = transcript_annotation_value
                         elements = transcript.child_elements
                         if elements:
                             for element in elements:
-                                cmp_elem = compare(current_variant, element)
+                                cmp_elem = compare(current_variant, element, ranked_sequences)
                                 if -1 <= cmp_elem <= 1:
                                     element_annotation_key = f'{element_annotation_key_prefix}_{element.region_type}'
-                                    element_annotation_value = f'[{single_annotation(element.info)}]'
+                                    element_annotation_value = f'[{make_single_annotation(element.info)}]'
                                     current_variant.info[element_annotation_key] = element_annotation_value
             if cmp == 1:
-                current_gene = next(transcriptome_it, None)
-            if cmp == -1:
-                current_variant = next(variants_it, None)
+                j = j + 1
             else:
-                current_gene = next(transcriptome_it, None)
-                current_variant = next(variants_it, None)
+                i = i + 1
+                j = j_lower_bound
+                variant_interacted = False
 
 
 def _assign_index_ordered_sequences(ref_sequences: Sequence[str]) -> Dict[str, int]:
@@ -152,11 +161,11 @@ def run_sv_annotation(vcf_path: str, gff_path: str, ref_genome_path: str, mode: 
         ref_sequences: Sequence[str] = ref_genome.references
         indexed_ref_sequences = _assign_index_ordered_sequences(ref_sequences)
         variants: List[VariantRecord] = _load_structural_variants(vcf_path, ref_sequences)
-        transcriptome: List[Gene, FunctionalGenomicRegion] = load_transcriptome_from_gff3(gff_path, ref_sequences, mode)
+        transcriptome, _ = load_transcriptome_from_gff3(gff_path, ref_sequences, mode)
         variants.sort(key=lambda x: (indexed_ref_sequences[x.contig], x.pos))
         transcriptome.sort(key=lambda y: (indexed_ref_sequences[y.sequence_name], y.first))
-        _annotate_structural_variants(variants, transcriptome, _compare_by_coordinates)
-        with open(''.join([vcf_output, OUTPUT_FILE_EXTENSION])) as writer:
+        _annotate_structural_variants(variants, transcriptome, indexed_ref_sequences, _compare_by_coordinates)
+        with open('.'.join([vcf_output, OUTPUT_FILE_EXTENSION]), 'w') as writer:
             writer.write(header_lines)
             for annotated_variant in variants:
                 writer.write(str(annotated_variant) + '\n')

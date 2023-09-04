@@ -14,18 +14,19 @@ ATTRIBUTE_KEY_VALUE: str = '='
 LOAD_MODE_MINIMAL = 'minimal'
 LOAD_MODE_BALANCED = 'balanced'
 LOAD_MODE_COMPLETE = 'complete'
+LOAD_MODE_PROTEIN_CODING = 'minimal_pc'
 
 
 def load_transcriptome_from_gff3(gff3_path: str, ref_sequences: Sequence[str], mode: str) -> (List[Union[Gene, FunctionalGenomicRegion]], List[str]):
-    """Load transcriptome from a gff3 file into a List of Gene objects, depending on the mode, different features will be included, as:
+    """Load annotations from a gff3 file into a List of Gene objects, depending on the mode, different features will be included, as:
     @:param
         gff3_path:str - the string path for the gff3 file
-        ref_sequences: Sequence[str] - Contains valid sequences for this transcriptome from the reference genome
+        ref_sequences: Sequence[str] - Contains valid sequences for this annotations from the reference genome
         mode: str - loading mode, as follows:
             LOAD_MODE_MINIMAL: Only gene records will be loaded
             LOAD_MODE_BALANCED: Genes, mRNA and 5UTR, 3UTR, CDS, Exons will be loaded
             LOAD_MODE_COMPLETE: Elements other than balanced mode objects will be loaded as FunctionalGenomicRegion generic instances
-    @:returns List of Gene and FunctionalGenomicRegions representing the transcriptome and a List with the header lines"""
+    @:returns List of Gene and FunctionalGenomicRegions representing the annotations and a List with the header lines"""
     transcriptome: List[Union[Gene, FunctionalGenomicRegion]] = []
     agenda: Dict[str, Union[Gene, Transcript, FunctionalGenomicRegion]] = {}
     with GFF3FileReader(gff3_path) as gff_records_iterator:
@@ -37,10 +38,14 @@ def load_transcriptome_from_gff3(gff3_path: str, ref_sequences: Sequence[str], m
                     f'gff record is annotated on invalid sequence: {gff_rec.seqid}, check gff file and reference genome')
             if gff_rec.type == GENE:
                 current_gene: Gene = gff_rec.make_functional_annotation()
+                if LOAD_MODE_PROTEIN_CODING == mode:
+                    byotype: str = current_gene.info.get('biotype')
+                    if byotype is None or byotype != 'protein_coding':
+                        continue
                 agenda[current_gene.ID] = current_gene
                 transcriptome.append(current_gene)
             elif gff_rec.type == TRANSCRIPT:
-                if LOAD_MODE_MINIMAL == mode:
+                if LOAD_MODE_MINIMAL == mode or LOAD_MODE_PROTEIN_CODING == mode:
                     continue
                 current_transcript: Transcript = gff_rec.make_functional_annotation()
                 agenda[current_transcript.ID] = current_transcript
@@ -50,7 +55,7 @@ def load_transcriptome_from_gff3(gff3_path: str, ref_sequences: Sequence[str], m
                     continue
                 parent_gene.add_element(current_transcript)
             elif gff_rec.type in (EXON, CDS, FIVE_PRIME_UTR, THREE_PRIME_UTR):
-                if LOAD_MODE_MINIMAL == mode:
+                if LOAD_MODE_MINIMAL == mode or LOAD_MODE_PROTEIN_CODING == mode:
                     continue
                 current_transcript_element: TranscriptElement = gff_rec.make_functional_annotation()
                 parent_id = current_transcript_element.info.get(gff_rec.ATTRIBUTE_PARENT)
@@ -226,4 +231,4 @@ if __name__ == "__main__":
                 for tr_element in transcript.child_elements:
                     print(str(tr_element))
     except Exception as error:
-        print(error)
+        raise
