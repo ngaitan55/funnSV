@@ -102,9 +102,9 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
         current_variant = variants[i]
         current_gene = transcriptome[j]
         cmp: int = compare(current_variant, current_gene, ranked_sequences)
-        print(
-            f'VARIANT: seq={current_variant.contig} type={current_variant.variant_type} first={current_variant.pos} last={current_variant.end} - GFFRecord: seq={current_gene.sequence_name}'
-            f' first={current_gene.first} last={current_gene.last} - COMPARE={cmp}')
+        # print(
+        #     f'VARIANT: seq={current_variant.contig} type={current_variant.variant_type} first={current_variant.pos} last={current_variant.end} - GFFRecord: seq={current_gene.sequence_name}'
+        #     f' first={current_gene.first} last={current_gene.last} - COMPARE={cmp}')
         if cmp < -1:
             i = i + 1
             j = j_lower_bound

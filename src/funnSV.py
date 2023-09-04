@@ -38,6 +38,7 @@ def exec_parser():
 
 
 def funnSV_main():
+    logging.basicConfig(level=logging.INFO)
     logging.info('Beginning execution')
     config = exec_parser()
     vcf_path = config.input
