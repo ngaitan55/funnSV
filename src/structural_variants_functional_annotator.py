@@ -9,6 +9,9 @@ from variant_extractor.variants import VariantRecord
 from annotations.transcriptome import Gene, Transcript, TranscriptElement, FunctionalGenomicRegion
 from annotations.annotations_handler import load_transcriptome_from_gff3
 
+FIELDS_ID_ONLY = 'ID'
+FIELDS_ALL = 'ALL'
+
 OUTPUT_FILE_EXTENSION = 'vcf'
 
 
@@ -76,17 +79,20 @@ def _compare_by_coordinates(variant: VariantRecord,
 
 def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: List[Gene, FunctionalGenomicRegion],
                                   ranked_sequences: Dict[str, int],
+                                  fields: str,
                                   compare: Callable[[VariantRecord, Union[
                                       Gene, Transcript, TranscriptElement, FunctionalGenomicRegion],
                                                      Dict[str, int]], int]):
     """
-    Annotates a structural variant list with a annotations coming from the annotations module
+    Annotates a structural variant list with an annotations coming from the annotations module
     :param variants: List with structural variants to annotate - <pre> Must be ordered by reference sequence and coordinates </pre>
-    :param transcriptome: List with a annotations represented by genes - <pre> Must be ordered by reference sequence and coordinates </pre>
+    :param transcriptome: List with an annotations represented by genes - <pre> Must be ordered by reference sequence and coordinates </pre>
+    :param fields: Fields to annotate, if == ID, this function will only annotate genes as a list of IDs
     :param compare: Function that compares a variant with a functional genomic region allowing the
         definition of the comparison to be flexible and dependent on the implementation of the parameter function
         must return an integer type
     """
+    id_only_key = 'ANNOTATED_GENES'
     gene_annotation_key_prefix = 'GENE_ANNOTATION'
     transcript_annotation_key_prefix = 'TRANSCRIPT_ANNOTATION'
     element_annotation_key_prefix = 'ELEMENT_ANNOTATION'
@@ -98,6 +104,7 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
     j = 0
     j_lower_bound = 0
     variant_interacted = False
+    gene_annotations: List[str] = []
     while i < len(variants) and j < len(transcriptome):
         current_variant = variants[i]
         current_gene = transcriptome[j]
@@ -109,6 +116,10 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
             i = i + 1
             j = j_lower_bound
             variant_interacted = False
+            if fields == FIELDS_ID_ONLY:
+                id_only_value = f"[{','.join(gene_annotations)}]"
+                current_variant.info[id_only_key] = id_only_value
+                gene_annotations = []
         elif cmp > 1:
             j_lower_bound = j_lower_bound + 1
             j = j_lower_bound
@@ -116,31 +127,40 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
             if not variant_interacted:
                 variant_interacted = True
                 j_lower_bound = j
-            gene_annotation_key = f'{gene_annotation_key_prefix}_{current_gene.ID}'
-            gene_annotation_value = f'[{make_single_annotation(current_gene.info)}]'
-            current_variant.info[gene_annotation_key] = gene_annotation_value
+            if fields == FIELDS_ALL:
+                gene_annotation_key = f'{gene_annotation_key_prefix}_{current_gene.ID}'
+                gene_annotation_value = f'[{make_single_annotation(current_gene.info)}]'
+                current_variant.info[gene_annotation_key] = gene_annotation_value
+            if fields == FIELDS_ID_ONLY:
+                gene_annotations.append(current_gene.ID.replace('gene:', ''))
             transcripts = current_gene.child_elements
             if transcripts:
                 for transcript in transcripts:
                     cmp_tr = compare(current_variant, transcript, ranked_sequences)
                     if -1 <= cmp_tr <= 1:
-                        transcript_annotation_key = f'{transcript_annotation_key_prefix}_{transcript.ID}'
-                        transcript_annotation_value = f'[{make_single_annotation(transcript.info)}]'
-                        current_variant.info[transcript_annotation_key] = transcript_annotation_value
+                        if fields == FIELDS_ALL:
+                            transcript_annotation_key = f'{transcript_annotation_key_prefix}_{transcript.ID}'
+                            transcript_annotation_value = f'[{make_single_annotation(transcript.info)}]'
+                            current_variant.info[transcript_annotation_key] = transcript_annotation_value
                         elements = transcript.child_elements
                         if elements:
                             for element in elements:
                                 cmp_elem = compare(current_variant, element, ranked_sequences)
                                 if -1 <= cmp_elem <= 1:
-                                    element_annotation_key = f'{element_annotation_key_prefix}_{element.region_type}'
-                                    element_annotation_value = f'[{make_single_annotation(element.info)}]'
-                                    current_variant.info[element_annotation_key] = element_annotation_value
+                                    if fields == FIELDS_ALL:
+                                        element_annotation_key = f'{element_annotation_key_prefix}_{element.region_type}'
+                                        element_annotation_value = f'[{make_single_annotation(element.info)}]'
+                                        current_variant.info[element_annotation_key] = element_annotation_value
             if cmp == 1:
                 j = j + 1
             else:
                 i = i + 1
                 j = j_lower_bound
                 variant_interacted = False
+                if fields == FIELDS_ID_ONLY:
+                    id_only_value = f"[{','.join(gene_annotations)}]"
+                    current_variant.info[id_only_key] = id_only_value
+                    gene_annotations = []
 
 
 def _assign_index_ordered_sequences(ref_sequences: Sequence[str]) -> Dict[str, int]:
@@ -154,7 +174,7 @@ def _extract_header(vcf_path: str) -> str:
     return header_str
 
 
-def run_sv_annotation(vcf_path: str, gff_path: str, ref_genome_path: str, mode: str, vcf_output: str):
+def run_sv_annotation(vcf_path: str, gff_path: str, ref_genome_path: str, mode: str, fields: str, vcf_output: str):
     try:
         header_lines: str = _extract_header(vcf_path)
         ref_genome: FastaFile = FastaFile(ref_genome_path)
@@ -164,7 +184,7 @@ def run_sv_annotation(vcf_path: str, gff_path: str, ref_genome_path: str, mode: 
         transcriptome, _ = load_transcriptome_from_gff3(gff_path, ref_sequences, mode)
         variants.sort(key=lambda x: (indexed_ref_sequences[x.contig], x.pos))
         transcriptome.sort(key=lambda y: (indexed_ref_sequences[y.sequence_name], y.first))
-        _annotate_structural_variants(variants, transcriptome, indexed_ref_sequences, _compare_by_coordinates)
+        _annotate_structural_variants(variants, transcriptome, indexed_ref_sequences, fields, _compare_by_coordinates)
         with open('.'.join([vcf_output, OUTPUT_FILE_EXTENSION]), 'w') as writer:
             writer.write(header_lines)
             for annotated_variant in variants:

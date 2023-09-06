@@ -33,6 +33,9 @@ def exec_parser():
             minimal_pc: Only genes with the biotype=protein_coding, to be used for very specific use cases}')
     parser.add_argument('-o', '--output_vcf_prefix', type=str, help='output file path prefix for annotated vcf file',
                         required=True)
+    parser.add_argument('-f', '--fields', type=str, help='amount of fields that are written in the vcf, all:\
+                                                   write all gff fields; id: Only gene IDs, mostly internal use',
+                        required=False, choices=['ALL', 'ID'], default='ALL')
     config = parser.parse_args()
     return config
 
@@ -45,9 +48,10 @@ def funnSV_main():
     gff_path = config.gff_file
     ref_genome_path = config.ref_genome
     mode = config.mode
+    fields = config.fields
     vcf_output = config.output_vcf_prefix
     logging.info('Producing annotation of vcf structural variants')
-    run_sv_annotation(vcf_path, gff_path, ref_genome_path, mode, vcf_output)
+    run_sv_annotation(vcf_path, gff_path, ref_genome_path, mode, fields, vcf_output)
     logging.info('Finished execution of funnSV successfully')
 
 
