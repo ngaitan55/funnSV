@@ -9,9 +9,11 @@ from variant_extractor.variants import VariantRecord
 from annotations.transcriptome import Gene, Transcript, TranscriptElement, FunctionalGenomicRegion
 from annotations.annotations_handler import load_transcriptome_from_gff3
 
-FIELDS_ID_ONLY = 'ID'
-FIELDS_ALL = 'ALL'
+FIELDS_ALL_PARAM = 'ALL'
 
+FIELDS_INFO_KEY = 'FUNNSV_ANNOTATIONS'
+FIELDS_SEPARATOR = '|'
+FIELD_NOT_PRESENT = '-'
 OUTPUT_FILE_EXTENSION = 'vcf'
 
 
@@ -92,13 +94,21 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
         definition of the comparison to be flexible and dependent on the implementation of the parameter function
         must return an integer type
     """
-    id_only_key = 'ANNOTATED_GENES'
-    gene_annotation_key_prefix = 'GENE_ANNOTATION'
-    transcript_annotation_key_prefix = 'TRANSCRIPT_ANNOTATION'
-    element_annotation_key_prefix = 'ELEMENT_ANNOTATION'
 
     def make_single_annotation(dict_x: Dict[str, str]) -> str:
-        return ';'.join([f'{key}={value}' for key, value in dict_x.items()])
+        filtered_items = []
+        if fields != FIELDS_ALL_PARAM:
+            fields_list = fields.split(',')
+            for field in fields_list:
+                field_value = dict_x.get(field)
+                if field_value is None:
+                    logging.warning(f"expected field {field} is not present in"
+                                    f" record {dict_x['ID']}")
+                    field_value = FIELD_NOT_PRESENT
+                filtered_items.append(field_value)
+        else:
+            filtered_items = dict_x.values()
+        return FIELDS_SEPARATOR.join(filtered_items)
 
     i = 0
     j = 0
@@ -116,9 +126,9 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
             i = i + 1
             j = j_lower_bound
             variant_interacted = False
-            if fields == FIELDS_ID_ONLY and gene_annotations:
-                id_only_value = f"{','.join(gene_annotations)}"
-                current_variant.info[id_only_key] = id_only_value
+            if gene_annotations:
+                annotation = f"{','.join(gene_annotations)}"
+                current_variant.info[FIELDS_INFO_KEY] = annotation
                 gene_annotations = []
         elif cmp > 1:
             j_lower_bound = j_lower_bound + 1
@@ -127,39 +137,29 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
             if not variant_interacted:
                 variant_interacted = True
                 j_lower_bound = j
-            if fields == FIELDS_ALL:
-                gene_annotation_key = f'{gene_annotation_key_prefix}_{current_gene.ID}'
-                gene_annotation_value = f'[{make_single_annotation(current_gene.info)}]'
-                current_variant.info[gene_annotation_key] = gene_annotation_value
-            if fields == FIELDS_ID_ONLY:
-                gene_annotations.append(current_gene.ID.replace('gene:', ''))
+            gene_annotations.append(make_single_annotation(current_gene.info))
             transcripts = current_gene.child_elements
             if transcripts:
                 for transcript in transcripts:
                     cmp_tr = compare(current_variant, transcript, ranked_sequences)
                     if -1 <= cmp_tr <= 1:
-                        if fields == FIELDS_ALL:
-                            transcript_annotation_key = f'{transcript_annotation_key_prefix}_{transcript.ID}'
-                            transcript_annotation_value = f'[{make_single_annotation(transcript.info)}]'
-                            current_variant.info[transcript_annotation_key] = transcript_annotation_value
+                        gene_annotations.append(make_single_annotation(transcript.info))
                         elements = transcript.child_elements
                         if elements:
                             for element in elements:
                                 cmp_elem = compare(current_variant, element, ranked_sequences)
                                 if -1 <= cmp_elem <= 1:
-                                    if fields == FIELDS_ALL:
-                                        element_annotation_key = f'{element_annotation_key_prefix}_{element.region_type}'
-                                        element_annotation_value = f'[{make_single_annotation(element.info)}]'
-                                        current_variant.info[element_annotation_key] = element_annotation_value
+                                    gene_annotations.append(f"{element.region_type}{FIELDS_SEPARATOR}"
+                                                            f"{element.info['Parent']}")
             if cmp == 1:
                 j = j + 1
             else:
                 i = i + 1
                 j = j_lower_bound
                 variant_interacted = False
-                if fields == FIELDS_ID_ONLY and gene_annotations:
-                    id_only_value = f"{','.join(gene_annotations)}"
-                    current_variant.info[id_only_key] = id_only_value
+                if gene_annotations:
+                    annotation = f"{','.join(gene_annotations)}"
+                    current_variant.info[FIELDS_INFO_KEY] = annotation
                     gene_annotations = []
 
 
@@ -167,16 +167,19 @@ def _assign_index_ordered_sequences(ref_sequences: Sequence[str]) -> Dict[str, i
     return {k: v for (k, v) in zip(ref_sequences, range(len(ref_sequences)))}
 
 
-def _extract_header(vcf_path: str) -> str:
+def _extract_header(vcf_path: str, fields_header_info_field: str) -> str:
     with open(vcf_path, 'r') as reader:
         with pysam.VariantFile(reader) as vcf_file:
+            vcf_file.header.add_line(fields_header_info_field)
             header_str = str(vcf_file.header)
     return header_str
 
 
 def run_sv_annotation(vcf_path: str, gff_path: str, ref_genome_path: str, mode: str, fields: str, vcf_output: str):
     try:
-        header_lines: str = _extract_header(vcf_path)
+        fields_header_info_field = (f"##INFO=<ID={FIELDS_INFO_KEY},Number=.,Type=String,Description=Annotated fields "
+                                    f"per gene: {fields.replace(',', FIELDS_SEPARATOR)}>")
+        header_lines: str = _extract_header(vcf_path, fields_header_info_field)
         ref_genome: FastaFile = FastaFile(ref_genome_path)
         ref_sequences: Sequence[str] = ref_genome.references
         indexed_ref_sequences = _assign_index_ordered_sequences(ref_sequences)

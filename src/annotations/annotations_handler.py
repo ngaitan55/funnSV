@@ -70,9 +70,10 @@ def load_transcriptome_from_gff3(gff3_path: str, ref_sequences: Sequence[str], m
                 if current_other_annotation.ID != gff_rec.GENERIC_ID:
                     if parent_id is None:
                         transcriptome.append(current_other_annotation)
-                    agenda[current_other_annotation.ID] = current_other_annotation
-                parent = agenda.get(parent_id)
-                parent.add_element(current_other_annotation)
+                        agenda[current_other_annotation.ID] = current_other_annotation
+                    else:
+                        parent = agenda.get(parent_id)
+                        parent.add_element(current_other_annotation)
         format_lines: List[str] = gff_records_iterator.format_lines
     return transcriptome, format_lines
 
@@ -193,16 +194,21 @@ class GFF3Record(AnnotationRecord):
         if GENE == self.type:
             if ID is None:
                 raise ValueError(f'gff3 Gene record {str(self)} is malformed, it does not contain an ID')
+            # Specific line for ensembl gff3 non_collateral fix
+            info[self.ATTRIBUTE_ID] = info[self.ATTRIBUTE_ID].replace('gene:', '')
             return Gene(ID, sequence_name, first, last, length, info)
         elif TRANSCRIPT == self.type:
             if ID is None:
                 raise ValueError(f'gff3 Transcript mRNA record {str(self)} is malformed, it does not contain an ID')
             if parent is None:
                 raise ValueError(f'Transcript from {str(self)} has no parent Gene, it cannot be instantiated')
+            # Specific line for ensembl gff3 non_collateral fix
+            info[self.ATTRIBUTE_ID] = info[self.ATTRIBUTE_ID].replace('transcript:', '')
             return Transcript(ID, sequence_name, first, last, length, info)
         elif self.type in (EXON, FIVE_PRIME_UTR, THREE_PRIME_UTR, CDS):
             if parent is None:
-                raise ValueError(f'Transcript element from {str(self)} has no parent Transcript, it cannot be instantiated')
+                raise ValueError(f'element from {str(self)} has no parent Transcript or Gene, it cannot be '
+                                 f'instantiated')
             return TranscriptElement(ID, sequence_name, first, last, length, self.type, info)
         else:
             if ID is None:

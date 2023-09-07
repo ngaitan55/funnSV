@@ -28,15 +28,28 @@ def exec_parser():
                         required=True)
     parser.add_argument('-r', '--ref_genome', type=str,
                         help='input fasta reference genome, must be indexed (.fa, .fasta, .fna)', required=True)
-    parser.add_argument('-m', '--mode', type=str, default='balanced',
-                        choices=['minimal', 'balanced', 'complete', 'minimal_pc'], help='mode of annotations, between {minimal:\
-            annotate only genes | balanced: annotate genes and their transcripts with specific elements | complete: annotate every element in the gff | \
-            minimal_pc: Only genes with the biotype=protein_coding, to be used for very specific use cases}')
     parser.add_argument('-o', '--output_vcf_prefix', type=str, help='output file path prefix for annotated vcf file',
                         required=True)
-    parser.add_argument('-f', '--fields', type=str, help='amount of fields that are written in the vcf, all:\
-                                                   write all gff fields; id: Only gene IDs, mostly internal use',
-                        required=False, choices=['ALL', 'ID'], default='ALL')
+    parser.add_argument('-m', '--mode', type=str,
+                        choices=['minimal', 'balanced', 'complete', 'minimal_pc'], help='mode of annotations, between '
+                                                                                        'minimal: annotate only genes '
+                                                                                        ', balanced: annotate genes '
+                                                                                        'and their transcripts with '
+                                                                                        'specific elements ,'
+                                                                                        'complete: annotate every '
+                                                                                        'element in the gff - '
+                                                                                        'to be used with caution -, '
+                                                                                        'minimal_pc: Only protein '
+                                                                                        'coding genes annotated with'
+                                                                                        'the column 9 field '
+                                                                                        'biotype=protein_coding',
+                        required=False, default='minimal')
+    parser.add_argument('-f', '--fields', type=str, help='specific Gene and/or Transcript fields that are annotated '
+                                                         'per variant in the vcf. ALL: write all gff fields or '
+                                                         'specify the input gff fields separated by comma, example: '
+                                                         'ID,Name,Alias Warning: Fields not found in the gff file '
+                                                         'should not be used in this parameter',
+                        required=False, default='ALL')
     config = parser.parse_args()
     return config
 
