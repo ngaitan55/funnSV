@@ -1,5 +1,4 @@
 from __future__ import annotations
-import sys
 from typing import Dict, Union, Optional, List, Sequence
 from .transcriptome import FunctionalGenomicRegion, Gene, Transcript, TranscriptElement, GENE, TRANSCRIPT, EXON, \
     THREE_PRIME_UTR, FIVE_PRIME_UTR, CDS
@@ -151,7 +150,8 @@ def _compute_attributes_from_gff_info_field(attributes_str: str) -> Dict[str, st
 
 
 class GFF3Record(AnnotationRecord):
-    """Class that represents a typical GFF3 record based on the format specification by Lincoln Stein at https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md"""
+    """Class that represents a typical GFF3 record based on the format specification by Lincoln Stein at
+    https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md"""
     # Static attributes
     ATTRIBUTE_ID = 'ID'
     ATTRIBUTE_NAME = 'Name'
@@ -212,23 +212,3 @@ class GFF3Record(AnnotationRecord):
     def __str__(self):
         return f"{self.seqid}{GFF_FIELD_SEPARATOR}{self.source}{GFF_FIELD_SEPARATOR}{self.type}{GFF_FIELD_SEPARATOR}{self.start}{GFF_FIELD_SEPARATOR}" \
                f"{self.end}{GFF_FIELD_SEPARATOR}{self.score}{GFF_FIELD_SEPARATOR}{self.strand}{GFF_FIELD_SEPARATOR}{self.phase}{GFF_FIELD_SEPARATOR}{self.attributes}"
-
-
-# Only for testing purposes
-if __name__ == "__main__":
-    from pysam import FastaFile
-    test_file = sys.argv[1]
-    ref_genome_path = sys.argv[2]
-    mode = sys.argv[3]
-    try:
-        ref_genome: FastaFile = FastaFile(ref_genome_path)
-        ref_seqs: Sequence[str] = ref_genome.references
-        test_transcriptome, _ = load_transcriptome_from_gff3(test_file, ref_seqs, mode)
-        for gene in test_transcriptome:
-            print(str(gene))
-            for transcript in gene.child_elements:
-                print(str(transcript))
-                for tr_element in transcript.child_elements:
-                    print(str(tr_element))
-    except Exception as error:
-        raise

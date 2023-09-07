@@ -14,7 +14,8 @@ from structural_variants_functional_annotator import run_sv_annotation
 
 if not sys.version_info >= (3, 7):
     raise SystemError(
-        f"Error: FunnSV works with Python version 3.7 or above (detected version: {sys.version_info.major}.{sys.version_info.minor}). Exiting")
+        f'Error: FunnSV works with Python version 3.7 or above \
+        (detected version: {sys.version_info.major}.{sys.version_info.minor}). Exiting')
 
 
 def exec_parser():

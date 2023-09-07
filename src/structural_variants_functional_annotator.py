@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Union, Sequence, Callable, Dict
+from typing import List, Union, Sequence, Callable, Dict
 import logging
 import pysam
 from pysam import FastaFile
@@ -117,7 +117,7 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
             j = j_lower_bound
             variant_interacted = False
             if fields == FIELDS_ID_ONLY:
-                id_only_value = f"[{','.join(gene_annotations)}]"
+                id_only_value = f"{','.join(gene_annotations)}"
                 current_variant.info[id_only_key] = id_only_value
                 gene_annotations = []
         elif cmp > 1:
@@ -192,14 +192,3 @@ def run_sv_annotation(vcf_path: str, gff_path: str, ref_genome_path: str, mode: 
     except Exception as error:
         logging.error(error)
         raise
-
-
-# Testing purposes only
-if __name__ == "__main__":
-    import sys
-
-    ref = sys.argv[1]
-    ref_gen: FastaFile = FastaFile(ref)
-    sequences: Sequence[str] = ref_gen.references
-    for seq in sequences:
-        print(seq)
