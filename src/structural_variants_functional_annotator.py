@@ -116,7 +116,7 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
             i = i + 1
             j = j_lower_bound
             variant_interacted = False
-            if fields == FIELDS_ID_ONLY:
+            if fields == FIELDS_ID_ONLY and gene_annotations:
                 id_only_value = f"{','.join(gene_annotations)}"
                 current_variant.info[id_only_key] = id_only_value
                 gene_annotations = []
@@ -157,8 +157,8 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
                 i = i + 1
                 j = j_lower_bound
                 variant_interacted = False
-                if fields == FIELDS_ID_ONLY:
-                    id_only_value = f"[{','.join(gene_annotations)}]"
+                if fields == FIELDS_ID_ONLY and gene_annotations:
+                    id_only_value = f"{','.join(gene_annotations)}"
                     current_variant.info[id_only_key] = id_only_value
                     gene_annotations = []
 
