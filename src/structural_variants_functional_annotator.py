@@ -6,6 +6,7 @@ import pysam
 from pysam import FastaFile
 from variant_extractor import VariantExtractor
 from variant_extractor.variants import VariantRecord
+from variant_extractor.variants import VariantType
 from annotations.transcriptome import Gene, Transcript, TranscriptElement, FunctionalGenomicRegion
 from annotations.annotations_handler import load_transcriptome_from_gff3
 
@@ -82,6 +83,7 @@ def _compare_by_coordinates(variant: VariantRecord,
 def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: List[Gene, FunctionalGenomicRegion],
                                   ranked_sequences: Dict[str, int],
                                   fields: str,
+                                  sv_length: int,
                                   compare: Callable[[VariantRecord, Union[
                                       Gene, Transcript, TranscriptElement, FunctionalGenomicRegion],
                                                      Dict[str, int]], int]):
@@ -90,6 +92,7 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
     :param variants: List with structural variants to annotate - <pre> Must be ordered by reference sequence and coordinates </pre>
     :param transcriptome: List with an annotations represented by genes - <pre> Must be ordered by reference sequence and coordinates </pre>
     :param fields: Fields to annotate, if == ID, this function will only annotate genes as a list of IDs
+    :param sv_length: length threshold that defines if a variant is an SV
     :param compare: Function that compares a variant with a functional genomic region allowing the
         definition of the comparison to be flexible and dependent on the implementation of the parameter function
         must return an integer type
@@ -110,6 +113,10 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
             filtered_items = dict_x.values()
         return FIELDS_SEPARATOR.join(filtered_items)
 
+    def is_indel(variant: VariantRecord) -> bool:
+        return (variant.variant_type == VariantType.INS or
+                variant.variant_type == VariantType.DEL) and variant.length < sv_length
+
     i = 0
     j = 0
     j_lower_bound = 0
@@ -117,6 +124,9 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
     gene_annotations: List[str] = []
     while i < len(variants) and j < len(transcriptome):
         current_variant = variants[i]
+        if current_variant.variant_type == VariantType.SNV or is_indel(current_variant):
+            i = i + 1
+            continue
         current_gene = transcriptome[j]
         cmp: int = compare(current_variant, current_gene, ranked_sequences)
         # print(
@@ -175,7 +185,8 @@ def _extract_header(vcf_path: str, fields_header_info_field: str) -> str:
     return header_str
 
 
-def run_sv_annotation(vcf_path: str, gff_path: str, ref_genome_path: str, mode: str, fields: str, vcf_output: str):
+def run_sv_annotation(vcf_path: str, gff_path: str, ref_genome_path: str, mode: str, fields: str, sv_length: int,
+                      vcf_output: str):
     try:
         fields_header_info_field = (f"##INFO=<ID={FIELDS_INFO_KEY},Number=.,Type=String,Description=Annotated fields "
                                     f"per gene: {fields.replace(',', FIELDS_SEPARATOR)}>")
@@ -187,7 +198,8 @@ def run_sv_annotation(vcf_path: str, gff_path: str, ref_genome_path: str, mode: 
         transcriptome, _ = load_transcriptome_from_gff3(gff_path, ref_sequences, mode)
         variants.sort(key=lambda x: (indexed_ref_sequences[x.contig], x.pos))
         transcriptome.sort(key=lambda y: (indexed_ref_sequences[y.sequence_name], y.first))
-        _annotate_structural_variants(variants, transcriptome, indexed_ref_sequences, fields, _compare_by_coordinates)
+        _annotate_structural_variants(variants, transcriptome, indexed_ref_sequences, fields, sv_length,
+                                      _compare_by_coordinates)
         with open('.'.join([vcf_output, OUTPUT_FILE_EXTENSION]), 'w') as writer:
             writer.write(header_lines)
             for annotated_variant in variants:

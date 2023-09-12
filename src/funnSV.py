@@ -48,8 +48,11 @@ def exec_parser():
                                                          'per variant in the vcf. ALL: write all gff fields or '
                                                          'specify the input gff fields separated by comma, example: '
                                                          'ID,Name,Alias Warning: Fields not found in the gff file '
-                                                         'should not be used in this parameter',
+                                                         'must not be used in this parameter',
                         required=False, default='ALL')
+    parser.add_argument('--sv_length', type=int, help='lower length threshold to define SVs, no indel which length is '
+                                                      'below will be annotated',
+                        required=False, default=50)
     config = parser.parse_args()
     return config
 
@@ -63,9 +66,10 @@ def funnSV_main():
     ref_genome_path = config.ref_genome
     mode = config.mode
     fields = config.fields
+    sv_length = config.sv_length
     vcf_output = config.output_vcf_prefix
     logging.info('Producing annotation of vcf structural variants')
-    run_sv_annotation(vcf_path, gff_path, ref_genome_path, mode, fields, vcf_output)
+    run_sv_annotation(vcf_path, gff_path, ref_genome_path, mode, fields, sv_length, vcf_output)
     logging.info('Finished execution of funnSV successfully')
 
 
