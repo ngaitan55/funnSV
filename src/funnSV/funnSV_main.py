@@ -10,7 +10,7 @@
 import sys
 from argparse import ArgumentParser
 import logging
-from funnSV.functional_analysis.structural_variants_functional_annotator import run_sv_annotation
+from src.funnSV.functional_analysis.structural_variants_functional_annotator import run_sv_annotation
 
 if not sys.version_info >= (3, 7):
     raise SystemError(

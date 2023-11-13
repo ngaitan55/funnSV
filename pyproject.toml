@@ -31,7 +31,7 @@ pysam="^0.21.0"
 variant-extractor="*"
 
 [tool.poetry.scripts]
-funnSV = 'funnSV.funnSV_main:run_funnSV'
+funnSV = 'src.funnSV.funnSV_main:run_funnSV'
 
 [tool.poetry.urls]
 "repository" = "https://github.com/ngaitan55/funnSV"

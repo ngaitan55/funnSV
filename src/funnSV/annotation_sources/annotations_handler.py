@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Dict, Union, Optional, List, Sequence
-from funnSV.annotation_sources.transcriptome import FunctionalGenomicRegion, Gene, Transcript, TranscriptElement, GENE, TRANSCRIPT, EXON, \
+from src.funnSV.annotation_sources.transcriptome import FunctionalGenomicRegion, Gene, Transcript, TranscriptElement, GENE, TRANSCRIPT, EXON, \
     THREE_PRIME_UTR, FIVE_PRIME_UTR, CDS
 
 # Static values

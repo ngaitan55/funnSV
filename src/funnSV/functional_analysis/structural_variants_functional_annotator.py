@@ -9,8 +9,8 @@ from pysam import FastaFile
 from variant_extractor import VariantExtractor
 from variant_extractor.variants import VariantRecord
 from variant_extractor.variants import VariantType
-from funnSV.annotation_sources.transcriptome import Gene, Transcript, TranscriptElement, FunctionalGenomicRegion
-from funnSV.annotation_sources.annotations_handler import load_transcriptome_from_gff3
+from src.funnSV.annotation_sources.transcriptome import Gene, Transcript, TranscriptElement, FunctionalGenomicRegion
+from src.funnSV.annotation_sources.annotations_handler import load_transcriptome_from_gff3
 
 FIELDS_ALL_PARAM = 'ALL'
 
