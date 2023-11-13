@@ -1,4 +1,6 @@
 from __future__ import annotations
+import sys
+#sys.path.append('../')
 
 from typing import List, Union, Sequence, Callable, Dict
 import logging
@@ -7,8 +9,8 @@ from pysam import FastaFile
 from variant_extractor import VariantExtractor
 from variant_extractor.variants import VariantRecord
 from variant_extractor.variants import VariantType
-from annotations.transcriptome import Gene, Transcript, TranscriptElement, FunctionalGenomicRegion
-from annotations.annotations_handler import load_transcriptome_from_gff3
+from funnSV.annotation_sources.transcriptome import Gene, Transcript, TranscriptElement, FunctionalGenomicRegion
+from funnSV.annotation_sources.annotations_handler import load_transcriptome_from_gff3
 
 FIELDS_ALL_PARAM = 'ALL'
 
@@ -88,9 +90,9 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
                                       Gene, Transcript, TranscriptElement, FunctionalGenomicRegion],
                                                      Dict[str, int]], int]):
     """
-    Annotates a structural variant list with an annotations coming from the annotations module
+    Annotates a structural variant list with an annotation_sources coming from the annotation_sources module
     :param variants: List with structural variants to annotate - <pre> Must be ordered by reference sequence and coordinates </pre>
-    :param transcriptome: List with an annotations represented by genes - <pre> Must be ordered by reference sequence and coordinates </pre>
+    :param transcriptome: List with an annotation_sources represented by genes - <pre> Must be ordered by reference sequence and coordinates </pre>
     :param fields: Fields to annotate, if == ID, this function will only annotate genes as a list of IDs
     :param sv_length: length threshold that defines if a variant is an SV
     :param compare: Function that compares a variant with a functional genomic region allowing the

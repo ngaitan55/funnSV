@@ -1,0 +1,38 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "funnSV"
+version = "0.0.1"
+license = "MIT"
+description = "Fast and effective functional annotation of SVs"
+authors = [
+  "Nicolas Gaitan <nicolas.gaitan@bsc.es>"
+]
+readme = "README.md"
+packages = [{include = "src"}]
+classifiers = [
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[tool.poetry.dependencies]
+python="^3.7"
+pysam="^0.21.0"
+variant-extractor="*"
+
+[tool.poetry.scripts]
+funnSV = 'funnSV.funnSV_main:run_funnSV'
+
+[tool.poetry.urls]
+"repository" = "https://github.com/ngaitan55/funnSV"
+

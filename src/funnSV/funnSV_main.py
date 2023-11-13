@@ -5,12 +5,12 @@
 #
 # Copyright 2022 - Barcelona Supercomputing Center
 # Author:  Nicolas Gaitan
-# Contact: nicolas.gaitan@bsc.es
+# Contact: ngaitan55@gmail.com
 # MIT License
 import sys
 from argparse import ArgumentParser
 import logging
-from structural_variants_functional_annotator import run_sv_annotation
+from funnSV.functional_analysis.structural_variants_functional_annotator import run_sv_annotation
 
 if not sys.version_info >= (3, 7):
     raise SystemError(
@@ -24,14 +24,14 @@ def exec_parser():
         description='Fast and effective functional annotation of SVs',
         epilog='')
     parser.add_argument('-i', '--input', type=str, help='input SV vcf file (.vcf, .vcf.gz)', required=True)
-    parser.add_argument('-g', '--gff_file', type=str, help='input gff to base annotations on (.gff3, .gff, .gtf)',
+    parser.add_argument('-g', '--gff_file', type=str, help='input gff to base annotation_sources on (.gff3, .gff, .gtf)',
                         required=True)
     parser.add_argument('-r', '--ref_genome', type=str,
                         help='input fasta reference genome, must be indexed (.fa, .fasta, .fna)', required=True)
     parser.add_argument('-o', '--output_vcf_prefix', type=str, help='output file path prefix for annotated vcf file',
                         required=True)
     parser.add_argument('-m', '--mode', type=str,
-                        choices=['minimal', 'balanced', 'complete', 'minimal_pc'], help='mode of annotations, between '
+                        choices=['minimal', 'balanced', 'complete', 'minimal_pc'], help='mode of annotation_sources, between '
                                                                                         'minimal: annotate only genes '
                                                                                         ', balanced: annotate genes '
                                                                                         'and their transcripts with '
@@ -57,7 +57,7 @@ def exec_parser():
     return config
 
 
-def funnSV_main():
+def run_funnSV():
     logging.basicConfig(level=logging.INFO)
     logging.info('Beginning execution')
     config = exec_parser()
@@ -74,4 +74,4 @@ def funnSV_main():
 
 
 if __name__ == "__main__":
-    funnSV_main()
+    run_funnSV()

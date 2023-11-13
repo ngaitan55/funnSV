@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Dict, Union, Optional, List, Sequence
-from .transcriptome import FunctionalGenomicRegion, Gene, Transcript, TranscriptElement, GENE, TRANSCRIPT, EXON, \
+from funnSV.annotation_sources.transcriptome import FunctionalGenomicRegion, Gene, Transcript, TranscriptElement, GENE, TRANSCRIPT, EXON, \
     THREE_PRIME_UTR, FIVE_PRIME_UTR, CDS
 
 # Static values
@@ -17,15 +17,15 @@ LOAD_MODE_PROTEIN_CODING = 'minimal_pc'
 
 
 def load_transcriptome_from_gff3(gff3_path: str, ref_sequences: Sequence[str], mode: str) -> (List[Union[Gene, FunctionalGenomicRegion]], List[str]):
-    """Load annotations from a gff3 file into a List of Gene objects, depending on the mode, different features will be included, as:
+    """Load annotation_sources from a gff3 file into a List of Gene objects, depending on the mode, different features will be included, as:
     @:param
         gff3_path:str - the string path for the gff3 file
-        ref_sequences: Sequence[str] - Contains valid sequences for this annotations from the reference genome
+        ref_sequences: Sequence[str] - Contains valid sequences for this annotation_sources from the reference genome
         mode: str - loading mode, as follows:
             LOAD_MODE_MINIMAL: Only gene records will be loaded
             LOAD_MODE_BALANCED: Genes, mRNA and 5UTR, 3UTR, CDS, Exons will be loaded
             LOAD_MODE_COMPLETE: Elements other than balanced mode objects will be loaded as FunctionalGenomicRegion generic instances
-    @:returns List of Gene and FunctionalGenomicRegions representing the annotations and a List with the header lines"""
+    @:returns List of Gene and FunctionalGenomicRegions representing the annotation_sources and a List with the header lines"""
     transcriptome: List[Union[Gene, FunctionalGenomicRegion]] = []
     agenda: Dict[str, Union[Gene, Transcript, FunctionalGenomicRegion]] = {}
     with GFF3FileReader(gff3_path) as gff_records_iterator:
