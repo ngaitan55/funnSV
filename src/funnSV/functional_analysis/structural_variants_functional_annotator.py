@@ -119,6 +119,17 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
         return (variant.variant_type == VariantType.INS or
                 variant.variant_type == VariantType.DEL) and variant.length < sv_length
 
+    def annotate(variant: VariantRecord, gene: Gene) -> bool:
+        if variant.variant_type != VariantType.INV:
+            return True
+        first_breakpoint = variant.pos
+        last_breakpoint = variant.end
+        first_gene = gene.first
+        last_gene = gene.last
+        if first_gene <= first_breakpoint <= last_gene or first_gene <= last_breakpoint <= last_gene:
+            return True
+        return False
+
     i = 0
     j = 0
     j_lower_bound = 0
@@ -149,20 +160,21 @@ def _annotate_structural_variants(variants: List[VariantRecord], transcriptome: 
             if not variant_interacted:
                 variant_interacted = True
                 j_lower_bound = j
-            gene_annotations.append(make_single_annotation(current_gene.info))
-            transcripts = current_gene.child_elements
-            if transcripts:
-                for transcript in transcripts:
-                    cmp_tr = compare(current_variant, transcript, ranked_sequences)
-                    if -1 <= cmp_tr <= 1:
-                        gene_annotations.append(make_single_annotation(transcript.info))
-                        elements = transcript.child_elements
-                        if elements:
-                            for element in elements:
-                                cmp_elem = compare(current_variant, element, ranked_sequences)
-                                if -1 <= cmp_elem <= 1:
-                                    gene_annotations.append(f"{element.region_type}{FIELDS_SEPARATOR}"
-                                                            f"{element.info['Parent']}")
+            if annotate(current_variant, current_gene):
+                gene_annotations.append(make_single_annotation(current_gene.info))
+                transcripts = current_gene.child_elements
+                if transcripts:
+                    for transcript in transcripts:
+                        cmp_tr = compare(current_variant, transcript, ranked_sequences)
+                        if -1 <= cmp_tr <= 1:
+                            gene_annotations.append(make_single_annotation(transcript.info))
+                            elements = transcript.child_elements
+                            if elements:
+                                for element in elements:
+                                    cmp_elem = compare(current_variant, element, ranked_sequences)
+                                    if -1 <= cmp_elem <= 1:
+                                        gene_annotations.append(f"{element.region_type}{FIELDS_SEPARATOR}"
+                                                                f"{element.info['Parent']}")
             if cmp == 1:
                 j = j + 1
             else:
